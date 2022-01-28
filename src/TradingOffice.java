@@ -6,9 +6,8 @@ import java.util.Calendar;
 import java.util.Date;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
-import org.apache.commons.lang3.ObjectUtils;
 
-class record{
+class record {
 	private Date date;
 	private double open;
 	private double high;
@@ -16,9 +15,11 @@ class record{
 	private double close;
 	private double adjClose;
 	private double volume;
-	private SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd"); 
-	public record(Date date, double open, double high, double low, double close, double adjClose, double volume) throws ParseException {
-		
+	private SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+	public record(Date date, double open, double high, double low, double close, double adjClose, double volume)
+			throws ParseException {
+
 		this.date = date;
 		this.open = open;
 		this.high = high;
@@ -27,7 +28,7 @@ class record{
 		this.adjClose = adjClose;
 		this.volume = volume;
 	}
-	
+
 	public Date getDate() {
 		return date;
 	}
@@ -58,93 +59,133 @@ class record{
 
 	@Override
 	public String toString() {
-		return String.format("Date: %s Open: %f High: %f Low: %f Close: %f Adj-Close: %f Volume: %f",formatter.format(this.getDate()),this.getOpen(),this.getHigh(),this.getLow(),this.getClose(),this.getAdjClose(),this.getVolume());
+		return String.format("Date: %s Open: %f High: %f Low: %f Close: %f Adj-Close: %f Volume: %f",
+				this.dateFormatter.format(this.getDate()), this.getOpen(), this.getHigh(), this.getLow(), this.getClose(),
+				this.getAdjClose(), this.getVolume());
 	}
 }
 
 class dataFrame {
 	private ArrayList<record> records;
-	private SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd"); 
+	private ArrayList<record> QDiv;
+	private Date firstDate;
+	private Date lastDate;
+	private SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 	Calendar cal = Calendar.getInstance();
+
 	public dataFrame(String datafile) {
 		this.records = new ArrayList<record>();
 		try {
-			 
-	        // create csvReader object 
-	        CSVReader csvReader = new CSVReaderBuilder(new FileReader(datafile)).withSkipLines(1).build();
-	        String[] nextRecord;
-	        
-	        // we are going to read data line by line
-	        while ((nextRecord = csvReader.readNext()) != null) {
-	        	String date = nextRecord[0];
-	    		double open = Double.parseDouble(nextRecord[1]);
-	    		double high = Double.parseDouble(nextRecord[2]);
-	    		double low = Double.parseDouble(nextRecord[3]);
-	    		double close = Double.parseDouble(nextRecord[4]);
-	    		double adjClose = Double.parseDouble(nextRecord[5]);
-	    		double volume = Double.parseDouble(nextRecord[6]);
-	    		records.add(new record(formatter.parse(date),open,high,low,close,adjClose,volume));
- 	        }
-	    }
-	    catch (Exception e) {
-	        e.printStackTrace();
-	    }
+
+			// create csvReader object
+			CSVReader csvReader = new CSVReaderBuilder(new FileReader(datafile)).withSkipLines(1).build();
+			String[] nextRecord;
+
+			// we are going to read data line by line
+			while ((nextRecord = csvReader.readNext()) != null) {
+				String date = nextRecord[0];
+				double open = Double.parseDouble(nextRecord[1]);
+				double high = Double.parseDouble(nextRecord[2]);
+				double low = Double.parseDouble(nextRecord[3]);
+				double close = Double.parseDouble(nextRecord[4]);
+				double adjClose = Double.parseDouble(nextRecord[5]);
+				double volume = Double.parseDouble(nextRecord[6]);
+				records.add(new record(this.dateFormatter.parse(date), open, high, low, close, adjClose, volume));
+			}
+			this.firstDate = records.get(0).getDate();
+			this.lastDate = records.get(records.size() - 1).getDate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
-	
+
 	public ArrayList<record> getRecordList() {
 		return records;
 	}
-	
+
 	public record getRecord(Date date) {
 		for (record r : this.records) {
-			if(r.getDate().equals(date)) {
+			if (r.getDate().equals(date)) {
 				return r;
 			}
 		}
 		return null;
 	}
-	
-	public record getRecord(String date) throws ParseException {
-		return getRecord(formatter.parse(date));
-	}
-	
 
-	private double SMA(Date start, Date end) {
-		Date LastDate = records.get(records.size()-1).getDate();
-		Date FirstDate = records.get(0).getDate();
-		
+	public record getRecord(String date) throws ParseException {
+		return getRecord(this.dateFormatter.parse(date));
+	}
+
+	public double SMA(Date start, int windSize) {
+
 		record startRec = getRecord(start);
-		record endRec = getRecord(end);
 		int startRecIndex = this.records.indexOf(startRec);
-		int endRecIndex = this.records.indexOf(endRec);
-		
-		int recNum = endRecIndex-startRecIndex+1;
+
 		double runningSum = 0;
 
-		if(startRec == null || endRec == null){
+		if (startRec == null) {
+			System.out.println("Invalid record");
 			return -1;
-		}else if(start.before(FirstDate) || end.after(LastDate) || end.before(start) || start.after(end)) {
+		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex+windSize > this.records.size()) {
+			System.out.println("invalid range");
 			return -1;
-		}else if(start.equals(end)){
+		} else if (windSize == 1) {
 			return getRecord(start).getClose();
-		}else {
-			for(int i = startRecIndex; i <= endRecIndex; i++) {
-
-				runningSum += this.records.get(i).getClose();
+		} else {
+			for (int i = 0; i < windSize; i++) {
+				runningSum += this.records.get(startRecIndex + i).getClose();
 			}
 		}
-		
-		return runningSum/recNum;
-	} 
+
+		return runningSum / windSize;
+	}
+	public double SMA(String start, int windSize) throws ParseException {
+		return SMA(this.dateFormatter.parse(start), windSize);
+	}
 	
-	public double SMA(String start, String end) throws ParseException {	
-		return SMA(formatter.parse(start),formatter.parse(end));	
+	public double EMA(Date start, int windSize) {
+		record startRec = getRecord(start);
+		int startRecIndex = this.records.indexOf(startRec); 
+		double EMA = -1;
+		
+		if (startRec == null) {
+			System.out.println("Invalid record");
+			return -1;
+		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex+windSize > this.records.size()) {
+			System.out.println("invalid range");
+			return -1;
+		} else if (windSize == 1) {
+			return getRecord(start).getClose();
+		} else {
+			double prevEMA = SMA(start,windSize);
+			
+			for (int j = 0; j < windSize; j++) {
+				double a = 2/((double)windSize+1);
+				double currentRecPrice = this.records.get(startRecIndex + j).getClose();
+				EMA = a*currentRecPrice+(1-a)*prevEMA;
+				prevEMA = EMA;
+			}
+			return EMA;
+		}
+	}
+	public double EMA(String start, int windSize) throws ParseException {
+		return EMA(this.dateFormatter.parse(start), windSize);
+	}
+	
+	public double getAnnualDiv(Date start) {
+		cal.setTime(start);
+		int year = cal.get(cal.YEAR);
+		// TODO implement div share calulation.
+		return 0;
 	}
 }
 
+
 public class TradingOffice {
 	static dataFrame df = new dataFrame("AAPL.csv");
+
 	public static void main(String[] args) throws ParseException {
-		System.out.println(df.SMA("1980-12-12", "1981-12-15"));
+		System.out.println(df.SMA("1980-12-12", 30));
+		System.out.println(df.EMA("1980-12-12", 25));
 	}
 }
