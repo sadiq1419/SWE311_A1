@@ -7,6 +7,8 @@ import java.util.Date;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 
+
+// class to safe  dividend records
 class divRecord {
 	private Double div;
 	private Date date;
@@ -24,13 +26,14 @@ class divRecord {
 	public Date getDate() {
 		return date;
 	}
-	
+
 	@Override
 	public String toString() {
-		return String.format("Date: %s Dividend: %f",this.dateFormatter.format(this.date),this.div);		
+		return String.format("Date: %s Dividend: %f", this.dateFormatter.format(this.date), this.div);
 	}
 }
 
+//class to safe normal records
 class record {
 	private Date date;
 	private double open;
@@ -54,41 +57,42 @@ class record {
 	}
 
 	public Date getDate() {
-		return date;
+		return this.date;
 	}
 
 	public double getOpen() {
-		return open;
+		return this.open;
 	}
 
 	public double getHigh() {
-		return high;
+		return this.high;
 	}
 
 	public double getLow() {
-		return low;
+		return this.low;
 	}
 
 	public double getClose() {
-		return close;
+		return this.close;
 	}
 
 	public double getAdjClose() {
-		return adjClose;
+		return this.adjClose;
 	}
 
 	public double getVolume() {
-		return volume;
+		return this.volume;
 	}
 
 	@Override
 	public String toString() {
 		return String.format("Date: %s Open: %f High: %f Low: %f Close: %f Adj-Close: %f Volume: %f",
-				this.dateFormatter.format(this.date), this.open, this.high, this.low,
-				this.close, this.adjClose, this.volume);
+				this.dateFormatter.format(this.date), this.open, this.high, this.low, this.close, this.adjClose,
+				this.volume);
 	}
 }
 
+//class to encapsulate all the needed calculation 
 class dataFrame {
 	private ArrayList<record> records;
 	private ArrayList<divRecord> divRecords;
@@ -108,6 +112,7 @@ class dataFrame {
 
 			// we are going to read data line by line
 			while ((nextRecord = csvReader.readNext()) != null) {
+				// set each attribute to a var
 				String date = nextRecord[0];
 				double open = Double.parseDouble(nextRecord[1]);
 				double high = Double.parseDouble(nextRecord[2]);
@@ -115,11 +120,14 @@ class dataFrame {
 				double close = Double.parseDouble(nextRecord[4]);
 				double adjClose = Double.parseDouble(nextRecord[5]);
 				double volume = Double.parseDouble(nextRecord[6]);
+				// create a record and added to ArrayList
 				records.add(new record(this.dateFormatter.parse(date), open, high, low, close, adjClose, volume));
 			}
+			// find the start and end date within our data
 			this.firstDate = records.get(0).getDate();
 			this.lastDate = records.get(records.size() - 1).getDate();
-			
+
+			// make csvReader object for dividend data
 			csvReader = new CSVReaderBuilder(new FileReader(dicDataFile)).withSkipLines(1).build();
 			String[] nextDiv;
 
@@ -127,18 +135,14 @@ class dataFrame {
 			while ((nextDiv = csvReader.readNext()) != null) {
 				String date = nextDiv[0];
 				double div = Double.parseDouble(nextDiv[1]);
-				
+
 				divRecords.add(new divRecord(this.dateFormatter.parse(date), div));
 			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
-	}
 
-	public ArrayList<record> getRecordList() {
-		return records;
 	}
 
 	public record getRecord(Date date) {
@@ -154,13 +158,13 @@ class dataFrame {
 		return getRecord(this.dateFormatter.parse(date));
 	}
 
+// SMA and EMA calculation functions
 	public double SMA(Date start, int windSize) {
-
 		record startRec = getRecord(start);
 		int startRecIndex = this.records.indexOf(startRec);
-
 		double runningSum = 0;
 
+		// window size range checking
 		if (startRec == null) {
 			System.out.println("Invalid record");
 			return -1;
@@ -176,10 +180,6 @@ class dataFrame {
 		}
 
 		return runningSum / windSize;
-	}
-
-	public double SMA(String start, int windSize) throws ParseException {
-		return SMA(this.dateFormatter.parse(start), windSize);
 	}
 
 	public double EMA(Date start, int windSize) {
@@ -208,32 +208,38 @@ class dataFrame {
 		}
 	}
 
+// overloading 
+	public double SMA(String start, int windSize) throws ParseException {
+		return SMA(this.dateFormatter.parse(start), windSize);
+	}
+
 	public double EMA(String start, int windSize) throws ParseException {
 		return EMA(this.dateFormatter.parse(start), windSize);
 	}
 
+// functions for dividend per share
 	public double getAnnualDiv(Date date) {
 		cal.setTime(date);
 		int year = cal.get(Calendar.YEAR);
 		double annualDiv = 0;
-		
-		for (divRecord r : this.divRecords) {	
+
+		for (divRecord r : this.divRecords) {
 			cal.setTime(r.getDate());
-			if( year == cal.get(Calendar.YEAR)) {
+			if (year == cal.get(Calendar.YEAR)) {
 				annualDiv += r.getDiv();
 			}
 		}
-		
+
 		return annualDiv;
 	}
 
 	public double getAnnualDiv(String date) throws ParseException {
 		return getAnnualDiv(this.dateFormatter.parse(date));
 	}
-	
+
 	public double getDivSharePrice(Date date) {
 		record r = getRecord(date);
-		return getAnnualDiv(date)/r.getVolume();
+		return getAnnualDiv(date) / r.getVolume();
 	}
 
 	public double getDivSharePrice(String date) throws ParseException {
@@ -242,14 +248,12 @@ class dataFrame {
 }
 
 public class TradingOffice {
-	static dataFrame df = new dataFrame("AAPL.csv","AAPL-Dividends.csv");
-
 	public static void main(String[] args) throws ParseException {
+		dataFrame df = new dataFrame("AAPL.csv", "AAPL-Dividends.csv");
+	
 		System.out.println(df.SMA("1980-12-12", 30));
 		System.out.println(df.EMA("1980-12-12", 25));
 		System.out.println(df.getAnnualDiv("1991-02-15"));
 		System.out.println(df.getDivSharePrice("1991-02-15"));
-
-
 	}
 }
