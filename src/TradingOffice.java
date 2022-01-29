@@ -7,6 +7,30 @@ import java.util.Date;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 
+class divRecord {
+	private Double div;
+	private Date date;
+	private SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+	public divRecord(Date date, Double div) {
+		this.div = div;
+		this.date = date;
+	}
+
+	public Double getDiv() {
+		return div;
+	}
+
+	public Date getDate() {
+		return date;
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("Date: %s Dividend: %f",this.dateFormatter.format(this.date),this.div);		
+	}
+}
+
 class record {
 	private Date date;
 	private double open;
@@ -60,21 +84,22 @@ class record {
 	@Override
 	public String toString() {
 		return String.format("Date: %s Open: %f High: %f Low: %f Close: %f Adj-Close: %f Volume: %f",
-				this.dateFormatter.format(this.getDate()), this.getOpen(), this.getHigh(), this.getLow(), this.getClose(),
-				this.getAdjClose(), this.getVolume());
+				this.dateFormatter.format(this.date), this.open, this.high, this.low,
+				this.close, this.adjClose, this.volume);
 	}
 }
 
 class dataFrame {
 	private ArrayList<record> records;
-	private ArrayList<record> QDiv;
+	private ArrayList<divRecord> divRecords;
 	private Date firstDate;
 	private Date lastDate;
 	private SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 	Calendar cal = Calendar.getInstance();
 
-	public dataFrame(String datafile) {
+	public dataFrame(String datafile, String dicDataFile) {
 		this.records = new ArrayList<record>();
+		this.divRecords = new ArrayList<divRecord>();
 		try {
 
 			// create csvReader object
@@ -94,9 +119,22 @@ class dataFrame {
 			}
 			this.firstDate = records.get(0).getDate();
 			this.lastDate = records.get(records.size() - 1).getDate();
+			
+			csvReader = new CSVReaderBuilder(new FileReader(dicDataFile)).withSkipLines(1).build();
+			String[] nextDiv;
+
+			// we are going to read data line by line
+			while ((nextDiv = csvReader.readNext()) != null) {
+				String date = nextDiv[0];
+				double div = Double.parseDouble(nextDiv[1]);
+				
+				divRecords.add(new divRecord(this.dateFormatter.parse(date), div));
+			}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
 	}
 
 	public ArrayList<record> getRecordList() {
@@ -126,7 +164,7 @@ class dataFrame {
 		if (startRec == null) {
 			System.out.println("Invalid record");
 			return -1;
-		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex+windSize > this.records.size()) {
+		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex + windSize > this.records.size()) {
 			System.out.println("invalid range");
 			return -1;
 		} else if (windSize == 1) {
@@ -139,53 +177,79 @@ class dataFrame {
 
 		return runningSum / windSize;
 	}
+
 	public double SMA(String start, int windSize) throws ParseException {
 		return SMA(this.dateFormatter.parse(start), windSize);
 	}
-	
+
 	public double EMA(Date start, int windSize) {
 		record startRec = getRecord(start);
-		int startRecIndex = this.records.indexOf(startRec); 
+		int startRecIndex = this.records.indexOf(startRec);
 		double EMA = -1;
-		
+
 		if (startRec == null) {
 			System.out.println("Invalid record");
 			return -1;
-		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex+windSize > this.records.size()) {
+		} else if (start.before(firstDate) || start.after(lastDate) || startRecIndex + windSize > this.records.size()) {
 			System.out.println("invalid range");
 			return -1;
 		} else if (windSize == 1) {
 			return getRecord(start).getClose();
 		} else {
-			double prevEMA = SMA(start,windSize);
-			
+			double prevEMA = SMA(start, windSize);
+
 			for (int j = 0; j < windSize; j++) {
-				double a = 2/((double)windSize+1);
+				double a = 2 / ((double) windSize + 1);
 				double currentRecPrice = this.records.get(startRecIndex + j).getClose();
-				EMA = a*currentRecPrice+(1-a)*prevEMA;
+				EMA = a * currentRecPrice + (1 - a) * prevEMA;
 				prevEMA = EMA;
 			}
 			return EMA;
 		}
 	}
+
 	public double EMA(String start, int windSize) throws ParseException {
 		return EMA(this.dateFormatter.parse(start), windSize);
 	}
+
+	public double getAnnualDiv(Date date) {
+		cal.setTime(date);
+		int year = cal.get(Calendar.YEAR);
+		double annualDiv = 0;
+		
+		for (divRecord r : this.divRecords) {	
+			cal.setTime(r.getDate());
+			if( year == cal.get(Calendar.YEAR)) {
+				annualDiv += r.getDiv();
+			}
+		}
+		
+		return annualDiv;
+	}
+
+	public double getAnnualDiv(String date) throws ParseException {
+		return getAnnualDiv(this.dateFormatter.parse(date));
+	}
 	
-	public double getAnnualDiv(Date start) {
-		cal.setTime(start);
-		int year = cal.get(cal.YEAR);
-		// TODO implement div share calulation.
-		return 0;
+	public double getDivSharePrice(Date date) {
+		record r = getRecord(date);
+		return getAnnualDiv(date)/r.getVolume();
+	}
+
+	public double getDivSharePrice(String date) throws ParseException {
+		return getDivSharePrice(this.dateFormatter.parse(date));
 	}
 }
 
-
 public class TradingOffice {
-	static dataFrame df = new dataFrame("AAPL.csv");
+	static dataFrame df = new dataFrame("AAPL.csv","AAPL-Dividends.csv");
 
 	public static void main(String[] args) throws ParseException {
 		System.out.println(df.SMA("1980-12-12", 30));
 		System.out.println(df.EMA("1980-12-12", 25));
+		System.out.println(df.getAnnualDiv("1991-02-15"));
+		System.out.println(df.getDivSharePrice("1991-02-15"));
+
+
 	}
 }
