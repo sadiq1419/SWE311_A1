@@ -157,7 +157,14 @@ class dataFrame {
 	public record getRecord(String date) throws ParseException {
 		return getRecord(this.dateFormatter.parse(date));
 	}
-
+	
+	public String getPrice(Date date) {
+		return getRecord(date).toString();
+	}
+	
+	public String getPrice(String date) throws ParseException {
+		return getRecord(this.dateFormatter.parse(date)).toString();
+	}
 // SMA and EMA calculation functions
 	public double SMA(Date start, int windSize) {
 		record startRec = getRecord(start);
@@ -250,10 +257,36 @@ class dataFrame {
 public class TradingOffice {
 	public static void main(String[] args) throws ParseException {
 		dataFrame df = new dataFrame("AAPL.csv", "AAPL-Dividends.csv");
-	
-		System.out.println(df.SMA("1980-12-12", 30));
-		System.out.println(df.EMA("1980-12-12", 25));
-		System.out.println(df.getAnnualDiv("1991-02-15"));
-		System.out.println(df.getDivSharePrice("1991-02-15"));
+		/*calculated values
+		 * SMA of 1980-12-12 for 5 days window = 0.1194
+		 * SMA of 1980-12-12 for 10 days window = 0.1299
+		 * SMA of 1980-12-12 for 50 days window = 0.1326
+		 * SMA of 1980-12-12 for 100 days window = 0.1247
+		 * 
+		 * EMA of 1980-12-12 for 5 days window = 0.1182
+		 * EMA of 1980-12-12 for 10 days window = 0.1356
+		 * EMA of 1980-12-12 for 50 days window = 0.1284
+		 * EMA of 1980-12-12 for 100 days window = 0.1220
+		 * 
+		 * Annual dividend for 1991 = 0.0043
+		 * 
+		 * dividend yield or dividend per share for 1991-02-15 = 1.1717E-11
+		 * */
+		
+		System.out.println("SMA of 1980-12-12 window size 5. expected = 0.1194 calulated   = "+df.SMA("1980-12-12", 5));
+		System.out.println("SMA of 1980-12-12 window size 10. expected = 0.1299 calulated  = "+df.SMA("1980-12-12", 10));
+		System.out.println("SMA of 1980-12-12 window size 50. expected = 0.1326 calulated  = "+df.SMA("1980-12-12", 50));
+		System.out.println("SMA of 1980-12-12 window size 100. expected = 0.1247 calulated = "+df.SMA("1980-12-12", 100));
+		System.out.println();
+		
+		System.out.println("EMA of 1980-12-12 window size 5. expected = 0.1182 calulated   = "+df.EMA("1980-12-12", 5));
+		System.out.println("EMA of 1980-12-12 window size 10. expected = 0.1356 calulated  = "+df.EMA("1980-12-12", 10));
+		System.out.println("EMA of 1980-12-12 window size 50. expected = 0.1284 calulated  = "+df.EMA("1980-12-12", 50));
+		System.out.println("EMA of 1980-12-12 window size 100. expected = 0.1220 calulated = "+df.EMA("1980-12-12", 100));
+		System.out.println();
+		
+		System.out.println("Expected Annual dividend for 1991 = 0.0043 calaulated = "+df.getAnnualDiv("1991-02-15"));
+		System.out.println("Expected dividend yield or dividend per share for 1991-02-15 = 1.17178*10^-11 calculated = "
+							+df.getDivSharePrice("1991-02-15"));
 	}
 }
